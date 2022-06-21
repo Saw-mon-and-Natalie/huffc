@@ -3,7 +3,7 @@ import getAllFileContents from "./utils/contents";
 import { isEndOfData } from "./utils/regex";
 import { Definitions } from "./utils/types";
 import { HIGH_LEVEL, MACRO_CODE } from "./syntax/defintions";
-import { parseArgs, getLineNumber } from "./utils/parsing";
+import { parseArgs, getLineNumber, removeComments } from "./utils/parsing";
 
 import { solidityKeccak256, keccak256, arrayify } from "ethers/lib/utils";
 import { parseCodeTable, parseJumpTable } from "./tables";
@@ -256,7 +256,7 @@ export const parseContent = (
   const events: Definitions["data"] = {};
 
   // Parse the content.
-  let input = content;
+  let input = removeComments(content);
 
   while (!isEndOfData(input)) {
     // Check if we are parsing a macro definition.

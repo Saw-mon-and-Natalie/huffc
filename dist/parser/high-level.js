@@ -178,7 +178,7 @@ var parseContent = function (content, importFile) {
     var functions = {};
     var events = {};
     // Parse the content.
-    var input = content;
+    var input = (0, parsing_1.removeComments)(content);
     while (!(0, regex_1.isEndOfData)(input)) {
         // Check if we are parsing a macro definition.
         if (defintions_1.HIGH_LEVEL.MACRO.test(input)) {
