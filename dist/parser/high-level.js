@@ -1,6 +1,6 @@
 "use strict";
 exports.__esModule = true;
-exports.setStoragePointers = exports.setStoragePointerConstants = exports.parseFile = void 0;
+exports.setStoragePointers = exports.setStoragePointerConstants = exports.parseContent = exports.parseFile = void 0;
 var contents_1 = require("./utils/contents");
 var regex_1 = require("./utils/regex");
 var defintions_1 = require("./syntax/defintions");
@@ -165,6 +165,156 @@ var parseFile = function (filePath) {
     return { macros: macros, constants: constants, functions: functions, events: events, tables: tables };
 };
 exports.parseFile = parseFile;
+/**
+ * Parse the content, storing the definitions of all constants, macros, and tables.
+ * @param content The content to parse.
+ */
+var parseContent = function (content, importFile) {
+    // Set defintion variables.
+    var macros = { data: {}, defintions: [] };
+    var constants = { data: {}, defintions: [] };
+    var tables = { data: {}, defintions: [] };
+    // Set output variables.
+    var functions = {};
+    var events = {};
+    // Parse the content.
+    var input = content;
+    while (!(0, regex_1.isEndOfData)(input)) {
+        // Check if we are parsing a macro definition.
+        if (defintions_1.HIGH_LEVEL.MACRO.test(input)) {
+            // Parse macro definition
+            var macro = input.match(defintions_1.HIGH_LEVEL.MACRO);
+            // Add the macro to the macros array.
+            macros.defintions.push(macro[2]);
+            // macros[name] = body, args.
+            macros.data[macro[2]] = { value: macro[7], args: (0, parsing_1.parseArgs)(macro[3]) };
+            // Parse the macro.
+            macros.data[macro[2]].data = (0, macros_1["default"])(macro[2], macros.data, constants.data, tables.data);
+            // Slice the input
+            input = input.slice(macro[0].length);
+        }
+        // Check if we are parsing an import.
+        else if (defintions_1.HIGH_LEVEL.IMPORT.test(input)) {
+            input = input.slice(input.match(defintions_1.HIGH_LEVEL.IMPORT)[0].length);
+        }
+        // Check if we are parsing a constant definition.
+        else if (defintions_1.HIGH_LEVEL.CONSTANT.test(input)) {
+            // Parse constant definition.
+            var constant = input.match(defintions_1.HIGH_LEVEL.CONSTANT);
+            var name_4 = constant[2];
+            var value = constant[3].replace("0x", "");
+            // Ensure that the constant name is all uppercase.
+            if (name_4.toUpperCase() !== name_4)
+                throw new SyntaxError("ParserError at ".concat(importFile ? importFile : "", " (Line ").concat((0, parsing_1.getLineNumber)(input, content), "): Constant ").concat(name_4, " must be uppercase."));
+            // Store the constant.
+            constants.defintions.push(name_4);
+            constants.data[name_4] = { value: value, args: [] };
+            // Slice the input.
+            input = input.slice(constant[0].length);
+        }
+        // Check if we are parsing a function definition.
+        else if (defintions_1.HIGH_LEVEL.FUNCTION.test(input)) {
+            // Parse the function definition.
+            var functionDef = input.match(defintions_1.HIGH_LEVEL.FUNCTION);
+            // Calculate the hash of the function definition and store the first 4 bytes.
+            // This is the signature of the function.
+            var name_5 = functionDef[2];
+            // Store the input and output strings.
+            var inputs = functionDef[3];
+            var outputs = functionDef[5];
+            // Store the function values.
+            var definition = {
+                inputs: inputs ? (0, parsing_1.parseArgs)(inputs) : [],
+                outputs: outputs ? (0, parsing_1.parseArgs)(functionDef[5]) : [],
+                type: functionDef[4]
+            };
+            // Store the function definition.
+            functions[name_5] = { value: name_5, args: [], data: definition };
+            // Slice the input.
+            input = input.slice(functionDef[0].length);
+        }
+        // Check if we're parsing an event defintion.
+        else if (defintions_1.HIGH_LEVEL.EVENT.test(input)) {
+            // Parse the event definition.
+            var eventDef = input.match(defintions_1.HIGH_LEVEL.EVENT);
+            // Calculate the hash of the event definition and store the first 4 bytes.
+            // This is the signature of the event.
+            var name_6 = eventDef[2];
+            // Store the args.
+            var args = (0, parsing_1.parseArgs)(eventDef[3]).map(function (arg) { return arg.replace("indexed", " indexed"); });
+            // Store the event definition.
+            events[name_6] = { value: name_6, args: args };
+            // Slice the input.
+            input = input.slice(eventDef[0].length);
+        }
+        // Check if we're parsing a code table definition.
+        else if (defintions_1.HIGH_LEVEL.CODE_TABLE.test(input)) {
+            // Parse the table definition.
+            var table = input.match(defintions_1.HIGH_LEVEL.CODE_TABLE);
+            var body = table[3];
+            // Parse the table.
+            var parsed = (0, tables_1.parseCodeTable)(body);
+            // Store the table definition.
+            tables.defintions.push(table[2]);
+            tables.data[table[2]] = { value: body, args: [parsed.table, parsed.size] };
+            // Slice the input
+            input = input.slice(table[0].length);
+        }
+        // Check if we're parsing a packed table definition.
+        else if (defintions_1.HIGH_LEVEL.JUMP_TABLE_PACKED.test(input)) {
+            // Parse the table definition.
+            var table = input.match(defintions_1.HIGH_LEVEL.JUMP_TABLE_PACKED);
+            var type = table[1];
+            // Ensure the type is valid.
+            if (type !== "jumptable__packed")
+                throw new SyntaxError("ParserError at ".concat(importFile ? importFile : "", " (Line ").concat((0, parsing_1.getLineNumber)(input, content), "): Table ").concat(table[0], " has invalid type: ").concat(type));
+            // Parse the table.
+            var body = table[3];
+            var parsed = (0, tables_1.parseJumpTable)(body, true);
+            // Store the table definition.
+            tables.defintions.push(table[2]);
+            tables.data[table[2]] = {
+                value: body,
+                args: [parsed.jumps, parsed.size],
+                data: [table[2], true]
+            };
+            // Slice the input.
+            input = input.slice(table[0].length);
+        }
+        // Check if we're parsing a jump table definition.
+        else if (defintions_1.HIGH_LEVEL.JUMP_TABLE.test(input)) {
+            // Parse the table definition.
+            var table = input.match(defintions_1.HIGH_LEVEL.JUMP_TABLE);
+            var type = table[1];
+            // Ensure the type is valid.
+            if (type !== "jumptable")
+                throw new SyntaxError("ParserError at ".concat(importFile ? importFile : "", " (Line ").concat((0, parsing_1.getLineNumber)(input, content), "): Table ").concat(table[0], " has invalid type: ").concat(type));
+            // Parse the table.
+            var body = table[3];
+            var parsed = (0, tables_1.parseJumpTable)(body, false);
+            // Store the table definition.
+            tables.defintions.push(table[2]);
+            tables.data[table[2]] = {
+                value: body,
+                args: [parsed.jumps, parsed.size],
+                data: [table[2], false]
+            };
+            // Slice the input.
+            input = input.slice(table[0].length);
+        }
+        else {
+            // Get the index of the current input.
+            var index = content.indexOf(input);
+            // Get the line number of the file.
+            var lineNumber = content.substring(0, index).split("\n").length;
+            // Raise error.
+            throw new SyntaxError("ParserError at ".concat(importFile ? importFile : "", "(Line ").concat(lineNumber, "): Invalid Syntax\n           \n           ").concat(input.slice(0, input.indexOf("\n")), "\n           ^\n           "));
+        }
+    }
+    // Return all values
+    return { macros: macros, constants: constants, functions: functions, events: events, tables: tables };
+};
+exports.parseContent = parseContent;
 var setStoragePointerConstants = function (macrosToSearch, macros, constants) {
     // Array of used storage pointer constants.
     var usedStoragePointerConstants = [];

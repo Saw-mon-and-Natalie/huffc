@@ -1,6 +1,6 @@
 import { padNBytes, toHex } from "./utils/bytes";
 import { compileMacro } from "./compiler/compiler";
-import { parseFile, setStoragePointerConstants } from "./parser/high-level";
+import { parseFile, parseContent, setStoragePointerConstants } from "./parser/high-level";
 import { ethers } from "ethers";
 import { generateAbi } from "./output";
 
@@ -8,6 +8,7 @@ import { generateAbi } from "./output";
 type HuffCompilerArgs = {
   filePath: string;
   generateAbi: boolean;
+  content?: string;
   constructorArgs?: { type: string; value: string }[];
 };
 
@@ -18,8 +19,10 @@ type HuffCompilerArgs = {
  * @returns The compiled bytecode.
  */
 const compile = (args: HuffCompilerArgs) => {
-  // Parse the file and generate definitions.
-  const { macros, constants, tables, functions, events } = parseFile(args.filePath);
+  // Parse the file or content and generate definitions.
+  const { macros, constants, tables, functions, events } = args.content
+    ? parseContent(args.content)
+    : parseFile(args.filePath);
 
   // Generate the contract ABI.
   const abi = args.generateAbi ? generateAbi(functions, events) : "";

@@ -12,8 +12,10 @@ var output_1 = require("./output");
  * @returns The compiled bytecode.
  */
 var compile = function (args) {
-    // Parse the file and generate definitions.
-    var _a = (0, high_level_1.parseFile)(args.filePath), macros = _a.macros, constants = _a.constants, tables = _a.tables, functions = _a.functions, events = _a.events;
+    // Parse the file or content and generate definitions.
+    var _a = args.content
+        ? (0, high_level_1.parseContent)(args.content)
+        : (0, high_level_1.parseFile)(args.filePath), macros = _a.macros, constants = _a.constants, tables = _a.tables, functions = _a.functions, events = _a.events;
     // Generate the contract ABI.
     var abi = args.generateAbi ? (0, output_1.generateAbi)(functions, events) : "";
     // Set storage pointer constants.
